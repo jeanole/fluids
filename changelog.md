@@ -5,6 +5,9 @@
 ### Added
 
 - CI: Added Python 3.15 and 3.15t (free-threaded) to the test matrix.
+- `mass_flow_uncertainty_ISO_5167_1_2003`: relative uncertainty of the mass flow rate of a differential pressure
+  meter from the uncertainties of C, the expansibility factor, both diameters, the differential pressure and the
+  density, with the practical working formula of ISO 5167-1:2003 clause 8.2. Every input is a required argument.
 
 ### Changed
 

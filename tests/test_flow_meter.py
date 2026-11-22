@@ -20,7 +20,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from math import log, log10
+from math import log, log10, sqrt
 
 import pytest
 
@@ -86,6 +86,7 @@ from fluids.flow_meter import (
     dP_wedge_meter,
     flow_coefficient,
     flow_meter_discharge,
+    mass_flow_uncertainty_ISO_5167_1_2003,
     nozzle_expansibility,
     orifice_expansibility,
     orifice_expansibility_1989,
@@ -483,6 +484,48 @@ def test_C_quarter_circle_orifice_ISO_15377_1998():
     for Do, C_expect in zip(betas, Cs_expect):
         C = C_quarter_circle_orifice_ISO_15377_1998(D=1, Do=Do)
         assert (round(C, 3) == C_expect)
+
+def test_mass_flow_uncertainty_ISO_5167_1_2003():
+    # Direct evaluation of the practical working formula
+    beta, U_C, U_e, U_D, U_d, U_dP, U_rho = 0.5, 0.5, 0.1, 0.4, 0.1, 0.5, 0.2
+    b4 = beta**4
+    expect = sqrt(U_C**2 + U_e**2 + (2*b4/(1 - b4)*U_D)**2 + (2/(1 - b4)*U_d)**2 + (U_dP/2)**2 + (U_rho/2)**2)
+    U = mass_flow_uncertainty_ISO_5167_1_2003(beta=beta, U_C=U_C, U_epsilon=U_e, U_D=U_D, U_Do=U_d,
+                                              U_dP=U_dP, U_rho=U_rho, U_additional=0.0)
+    assert_close(U, expect, rtol=1e-14)
+
+    # Each input alone gives its own sensitivity coefficient
+    kw = dict(beta=0.6, U_C=0.0, U_epsilon=0.0, U_D=0.0, U_Do=0.0, U_dP=0.0, U_rho=0.0, U_additional=0.0)
+    b4 = 0.6**4
+    for name, coefficient in [("U_C", 1.0), ("U_epsilon", 1.0), ("U_D", 2*b4/(1 - b4)), ("U_Do", 2/(1 - b4)),
+                              ("U_dP", 0.5), ("U_rho", 0.5), ("U_additional", 1.0)]:
+        args = dict(kw)
+        args[name] = 0.3
+        assert_close(mass_flow_uncertainty_ISO_5167_1_2003(**args), coefficient*0.3, rtol=1e-13)
+    assert mass_flow_uncertainty_ISO_5167_1_2003(**kw) == 0.0
+
+    # Additional uncertainties are added arithmetically, not in quadrature
+    base = mass_flow_uncertainty_ISO_5167_1_2003(beta=0.5, U_C=0.5, U_epsilon=0.1, U_D=0.4, U_Do=0.1,
+                                                 U_dP=0.5, U_rho=0.2, U_additional=0.0)
+    with_extra = mass_flow_uncertainty_ISO_5167_1_2003(beta=0.5, U_C=0.5, U_epsilon=0.1, U_D=0.4, U_Do=0.1,
+                                                       U_dP=0.5, U_rho=0.2, U_additional=0.5)
+    assert_close(with_extra, base + 0.5, rtol=1e-14)
+
+    # Liquid, no expansibility uncertainty; small beta, pipe diameter barely matters
+    U = mass_flow_uncertainty_ISO_5167_1_2003(beta=0.1, U_C=0.6, U_epsilon=0.0, U_D=0.4, U_Do=0.1,
+                                              U_dP=0.0, U_rho=0.0, U_additional=0.0)
+    assert_close(U, sqrt(0.6**2 + (2*1e-4/(1 - 1e-4)*0.4)**2 + (2/(1 - 1e-4)*0.1)**2), rtol=1e-14)
+
+    # Larger diameter ratios make the diameter terms grow
+    lo = mass_flow_uncertainty_ISO_5167_1_2003(beta=0.3, U_C=0.0, U_epsilon=0.0, U_D=0.4, U_Do=0.1,
+                                               U_dP=0.0, U_rho=0.0, U_additional=0.0)
+    hi = mass_flow_uncertainty_ISO_5167_1_2003(beta=0.75, U_C=0.0, U_epsilon=0.0, U_D=0.4, U_Do=0.1,
+                                               U_dP=0.0, U_rho=0.0, U_additional=0.0)
+    assert hi > lo
+
+    # Every argument is required
+    with pytest.raises(TypeError):
+        mass_flow_uncertainty_ISO_5167_1_2003(beta=0.5, U_C=0.5, U_epsilon=0.1, U_D=0.4, U_Do=0.1, U_dP=0.5, U_rho=0.2)
 
 def test_K_to_discharge_coefficient():
     C = K_to_discharge_coefficient(D=0.07366, Do=0.05, K=5.2314291729754)

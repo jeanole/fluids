@@ -81,6 +81,10 @@ Wedge Meters
 .. autofunction:: diameter_ratio_wedge_meter
 .. autofunction:: dP_wedge_meter
 
+Flow Rate Uncertainty
+---------------------
+.. autofunction:: mass_flow_uncertainty_ISO_5167_1_2003
+
 Flow Meter Utilities
 --------------------
 .. autofunction:: discharge_coefficient_to_K
@@ -127,6 +131,7 @@ __all__: list[str] = [
     "discharge_coefficient_to_K",
     "flow_coefficient",
     "flow_meter_discharge",
+    "mass_flow_uncertainty_ISO_5167_1_2003",
     "nozzle_expansibility",
     "orifice_expansibility",
     "orifice_expansibility_1989",
@@ -1106,6 +1111,93 @@ def C_quarter_circle_orifice_ISO_15377_1998(D: float, Do: float) -> float:
     beta = Do/D
     C = beta*(beta*(1.5084*beta - 1.16158) + 0.3309) + 0.73823
     return C
+
+def mass_flow_uncertainty_ISO_5167_1_2003(beta: float, U_C: float, U_epsilon: float, U_D: float,
+                                          U_Do: float, U_dP: float, U_rho: float,
+                                          U_additional: float) -> float:
+    r"""Calculates the relative uncertainty of the mass flow rate measured
+    by a differential pressure flow meter from the relative uncertainties of
+    the quantities in the flow equation, according to the practical working
+    formula of [1]_:
+
+    .. math::
+        U_{q_m} = \sqrt{U_C^2 + U_\epsilon^2
+        + \left(\frac{2\beta^4}{1 - \beta^4}U_D\right)^2
+        + \left(\frac{2}{1 - \beta^4}U_{D_o}\right)^2
+        + \left(\frac{1}{2}U_{\Delta P}\right)^2
+        + \left(\frac{1}{2}U_{\rho}\right)^2}
+        + U_{additional}
+
+    Parameters
+    ----------
+    beta : float
+        Diameter ratio of the meter, d/D, [-]
+    U_C : float
+        Relative uncertainty of the discharge coefficient, from the part of
+        ISO 5167 for the meter, [%]
+    U_epsilon : float
+        Relative uncertainty of the expansibility factor, from the part of
+        ISO 5167 for the meter; zero for liquids, [%]
+    U_D : float
+        Relative uncertainty of the upstream internal pipe diameter, [%]
+    U_Do : float
+        Relative uncertainty of the diameter of the orifice or throat, [%]
+    U_dP : float
+        Relative uncertainty of the measured differential pressure, [%]
+    U_rho : float
+        Relative uncertainty of the density of the fluid at the upstream
+        pressure tapping, [%]
+    U_additional : float
+        Sum of any additional relative uncertainties which the applicable part
+        of ISO 5167 requires to be added arithmetically, for example for
+        shortened straight lengths; zero if there are none, [%]
+
+    Returns
+    -------
+    U_m : float
+        Relative uncertainty of the mass flow rate, [%]
+
+    Notes
+    -----
+    Every input is required; no value is assumed for any of them. All of
+    them should be at the same level of confidence, which in ISO 5167 is
+    about 95 %; the result is then at that level too.
+
+    The formula treats the uncertainties of `C`, `epsilon`, `Do`, `dP` and
+    `rho` as independent, and neglects covariance terms; [1]_ states that
+    this is sufficient for most practical purposes, and that the dependence
+    of `C` and `epsilon` on the Reynolds number, the pressure ratio and the
+    isentropic exponent is covered by their own uncertainties.
+
+    [1]_ gives the largest values of `U_D` and `U_Do` that follow from the
+    tolerances of ISO 5167 as 0.4 % and 0.1 % respectively; smaller actual
+    values may be used instead. The uncertainties of `dP` and `rho` must be
+    determined by the user, including any part stated by an instrument
+    manufacturer as a percentage of full scale.
+
+    The formula is written for meters whose diameter ratio is the bore or
+    throat diameter divided by the pipe diameter (ISO 5167-2 to -4).
+
+    Examples
+    --------
+    >>> mass_flow_uncertainty_ISO_5167_1_2003(beta=0.5, U_C=0.5, U_epsilon=0.1,
+    ... U_D=0.4, U_Do=0.1, U_dP=0.5, U_rho=0.2, U_additional=0.0)
+    0.617134957327
+
+    References
+    ----------
+    .. [1] ISO 5167-1:2003 - Measurement of Fluid Flow by Means of Pressure
+       Differential Devices Inserted in Circular Cross-Section Conduits Running
+       Full -- Part 1: General Principles and Requirements. Clause 8.2,
+       Equation (3).
+    """
+    beta4 = beta*beta*beta*beta
+    x = 1.0/(1.0 - beta4)
+    U_D_term = 2.0*beta4*x*U_D
+    U_Do_term = 2.0*x*U_Do
+    return sqrt(U_C*U_C + U_epsilon*U_epsilon + U_D_term*U_D_term + U_Do_term*U_Do_term
+                + 0.25*U_dP*U_dP + 0.25*U_rho*U_rho) + U_additional
+
 
 def discharge_coefficient_to_K(D: float, Do: float, C: float) -> float:
     r"""Converts a discharge coefficient to a standard loss coefficient,
