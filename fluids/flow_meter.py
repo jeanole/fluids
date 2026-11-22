@@ -57,6 +57,9 @@ Nozzle Flow Meters
 .. autofunction:: C_ISA_1932_nozzle
 .. autofunction:: C_venturi_nozzle
 .. autofunction:: nozzle_expansibility
+.. autofunction:: ISA_1932_nozzle_validity_ISO_5167_3_2022
+.. autofunction:: ISA_1932_nozzle_C_uncertainty_ISO_5167_3_2022
+.. autofunction:: ISA_1932_nozzle_expansibility_uncertainty_ISO_5167_3_2022
 
 Venturi Tube Meters
 -------------------
@@ -93,7 +96,7 @@ Flow Meter Utilities
 """
 from __future__ import annotations
 
-from math import acos, exp, log, log10, pi, sqrt
+from math import acos, exp, inf, log, log10, pi, sqrt
 
 from fluids.constants import inch, inch_inv, pi_inv, root_two
 from fluids.core import Froude_densimetric
@@ -110,6 +113,9 @@ __all__: list[str] = [
     "C_venturi_nozzle",
     "C_wedge_meter_ISO_5167_6_2017",
     "C_wedge_meter_Miller",
+    "ISA_1932_nozzle_C_uncertainty_ISO_5167_3_2022",
+    "ISA_1932_nozzle_expansibility_uncertainty_ISO_5167_3_2022",
+    "ISA_1932_nozzle_validity_ISO_5167_3_2022",
     "K_to_discharge_coefficient",
     "all_meters",
     "cone_meter_expansibility_Stewart",
@@ -1564,6 +1570,212 @@ def C_ISA_1932_nozzle(D: float, Do: float, rho: float, mu: float, m: float) -> f
     C = (0.9900 - 0.2262*beta**4.1
          - (0.00175*beta*beta - 0.0033*beta**4.15)*(1E6/Re_D)**1.15)
     return C
+
+
+def ISA_1932_nozzle_validity_ISO_5167_3_2022(D: float, Do: float, Re_D: float | None=None,
+                                             m: float | None=None, mu: float | None=None,
+                                             P1: float | None=None, P2: float | None=None) -> dict:
+    r"""Checks an ISA 1932 nozzle against the limits of use of its discharge
+    coefficient equation (:obj:`C_ISA_1932_nozzle`) given in [1]_. Nothing is
+    raised for out of range inputs; each limit is reported with the actual
+    value, the permitted range, and whether or not it is satisfied.
+
+    .. math::
+        0.05 \text{ m} \le D \le 0.5 \text{ m}
+
+    .. math::
+        0.3 \le \beta \le 0.8
+
+    .. math::
+        7\times 10^4 \le Re_D \le 10^7 \text{ for } 0.30 \le \beta < 0.44
+
+    .. math::
+        2\times 10^4 \le Re_D \le 10^7 \text{ for } 0.44 \le \beta \le 0.80
+
+    For compressible fluids, the limit of the expansibility equation
+    (:obj:`nozzle_expansibility`) is also checked:
+
+    .. math::
+        \frac{P_2}{P_1} \ge 0.75
+
+    Parameters
+    ----------
+    D : float
+        Upstream internal pipe diameter, [m]
+    Do : float
+        Diameter of nozzle throat at flow conditions, [m]
+    Re_D : float, optional
+        Reynolds number of the fluid with respect to the upstream pipe
+        diameter `D`; if not provided it is calculated from `m` and `mu`
+        when both of them are given, [-]
+    m : float, optional
+        Mass flow rate of fluid through the nozzle, [kg/s]
+    mu : float, optional
+        Viscosity of fluid at `P1`, [Pa*s]
+    P1 : float, optional
+        Static pressure of fluid upstream of the nozzle at the cross-section
+        of the pressure tap; provide for gases only, [Pa]
+    P2 : float, optional
+        Static pressure of fluid downstream of the nozzle at the cross-section
+        of the pressure tap; provide for gases only, [Pa]
+
+    Returns
+    -------
+    checks : dict[str, tuple[float, float, float, bool]]
+        Dictionary with one entry per limit which could be evaluated; the
+        keys are 'D', 'beta', 'Re_D' and 'P2/P1', and each value is a tuple
+        of (actual value, minimum permitted value, maximum permitted value,
+        whether the limit is satisfied). Where there is no maximum, infinity
+        is given in its place. Values are in the same units as the inputs,
+        [-]
+
+    Notes
+    -----
+    The 'Re_D' entry is only present if `Re_D` or both of `m` and `mu` were
+    given; the 'P2/P1' entry is only present if both `P1` and `P2` were
+    given. The pressure ratio limit does not apply to liquids. For a diameter
+    ratio outside 0.3 to 0.8 the Reynolds number range of the nearest end is
+    used.
+
+    The Reynolds number is calculated as:
+
+    .. math::
+        Re_D = \frac{4m}{\pi D \mu}
+
+    All of the limits are inclusive except the boundary at a diameter ratio
+    of 0.44, which belongs to the upper range. No tolerance is applied.
+
+    [1]_ also limits the relative roughness of the upstream pipe as a
+    function of the diameter ratio; that is not checked.
+
+    Whether or not every limit evaluated is satisfied can be found with
+    ``all(check[3] for check in checks.values())``.
+
+    Examples
+    --------
+    >>> checks = ISA_1932_nozzle_validity_ISO_5167_3_2022(D=0.1, Do=0.06,
+    ... Re_D=1E5, P1=1E5, P2=9E4)
+    >>> checks['Re_D']
+    (100000.0, 20000.0, 10000000.0, True)
+    >>> all(check[3] for check in checks.values())
+    True
+
+    References
+    ----------
+    .. [1] ISO 5167-3:2022 - Measurement of Fluid Flow by Means of Pressure
+       Differential Devices Inserted in Circular Cross-Section Conduits Running
+       Full -- Part 3: Nozzles and Venturi Nozzles. Clause 5.1.6.1, Limits of
+       use, and clause 5.1.6.3.
+    """
+    beta = Do/D
+    checks: dict = {
+        "D": (D, 0.05, 0.5, 0.05 <= D <= 0.5),
+        "beta": (beta, 0.3, 0.8, 0.3 <= beta <= 0.8),
+    }
+    if Re_D is None and m is not None and mu is not None:
+        Re_D = 4.0*m/(pi*D*mu)
+    if Re_D is not None:
+        Re_D_min = 7E4 if beta < 0.44 else 2E4
+        checks["Re_D"] = (Re_D, Re_D_min, 1E7, Re_D_min <= Re_D <= 1E7)
+    if P1 is not None and P2 is not None:
+        P_ratio = P2/P1
+        checks["P2/P1"] = (P_ratio, 0.75, inf, P_ratio >= 0.75)
+    return checks
+
+
+def ISA_1932_nozzle_C_uncertainty_ISO_5167_3_2022(D: float, Do: float) -> float:
+    r"""Calculates the relative expanded uncertainty of the discharge
+    coefficient of an ISA 1932 nozzle calculated with
+    :obj:`C_ISA_1932_nozzle`, according to [1]_.
+
+    .. math::
+        U_C = 0.8 \text{ for } \beta \le 0.6
+
+    .. math::
+        U_C = 2\beta - 0.4 \text{ for } \beta > 0.6
+
+    Parameters
+    ----------
+    D : float
+        Upstream internal pipe diameter, [m]
+    Do : float
+        Diameter of nozzle throat at flow conditions, [m]
+
+    Returns
+    -------
+    U_C : float
+        Relative expanded uncertainty of the coefficient of discharge of the
+        nozzle, [%]
+
+    Notes
+    -----
+    [1]_ gives this uncertainty at a coverage factor of 2, approximately a
+    95 % level of confidence, on the assumption that the diameter ratio, the
+    pipe diameter, the Reynolds number and the relative roughness are known
+    without error. It applies only within the limits of use checked by
+    :obj:`ISA_1932_nozzle_validity_ISO_5167_3_2022`; no check of this is
+    made.
+
+    Examples
+    --------
+    >>> ISA_1932_nozzle_C_uncertainty_ISO_5167_3_2022(D=0.1, Do=0.07)
+    1.0
+
+    References
+    ----------
+    .. [1] ISO 5167-3:2022 - Measurement of Fluid Flow by Means of Pressure
+       Differential Devices Inserted in Circular Cross-Section Conduits Running
+       Full -- Part 3: Nozzles and Venturi Nozzles. Clause 5.1.7.1.
+    """
+    beta = Do/D
+    if beta <= 0.6:
+        return 0.8
+    return 2.0*beta - 0.4
+
+
+def ISA_1932_nozzle_expansibility_uncertainty_ISO_5167_3_2022(P1: float, P2: float) -> float:
+    r"""Calculates the relative expanded uncertainty of the expansibility
+    factor of an ISA 1932 nozzle calculated with :obj:`nozzle_expansibility`,
+    according to [1]_.
+
+    .. math::
+        U_\epsilon = 2\frac{\Delta P}{P_1}
+
+    Parameters
+    ----------
+    P1 : float
+        Static pressure of fluid upstream of the nozzle at the cross-section
+        of the pressure tap, [Pa]
+    P2 : float
+        Static pressure of fluid downstream of the nozzle at the cross-section
+        of the pressure tap, [Pa]
+
+    Returns
+    -------
+    U_epsilon : float
+        Relative expanded uncertainty of the expansibility factor, [%]
+
+    Notes
+    -----
+    [1]_ gives this uncertainty at a coverage factor of 2, approximately a
+    95 % level of confidence. Unlike that of an orifice plate it does not
+    depend on the isentropic exponent.
+
+    The expansibility factor of a liquid is exactly 1 and has no
+    uncertainty; this function should not be used for liquids.
+
+    Examples
+    --------
+    >>> ISA_1932_nozzle_expansibility_uncertainty_ISO_5167_3_2022(P1=1E5, P2=9E4)
+    0.2
+
+    References
+    ----------
+    .. [1] ISO 5167-3:2022 - Measurement of Fluid Flow by Means of Pressure
+       Differential Devices Inserted in Circular Cross-Section Conduits Running
+       Full -- Part 3: Nozzles and Venturi Nozzles. Clause 5.1.7.2.
+    """
+    return 2.0*(P1 - P2)/P1
 
 
 def C_venturi_nozzle(D: float, Do: float) -> float:
