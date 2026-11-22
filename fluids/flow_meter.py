@@ -1134,34 +1134,36 @@ def mass_flow_uncertainty_ISO_5167_1_2003(beta: float, U_C: float, U_epsilon: fl
         Diameter ratio of the meter, d/D, [-]
     U_C : float
         Relative uncertainty of the discharge coefficient, from the part of
-        ISO 5167 for the meter, [%]
+        ISO 5167 for the meter, [-]
     U_epsilon : float
         Relative uncertainty of the expansibility factor, from the part of
-        ISO 5167 for the meter; zero for liquids, [%]
+        ISO 5167 for the meter; zero for liquids, [-]
     U_D : float
-        Relative uncertainty of the upstream internal pipe diameter, [%]
+        Relative uncertainty of the upstream internal pipe diameter, [-]
     U_Do : float
-        Relative uncertainty of the diameter of the orifice or throat, [%]
+        Relative uncertainty of the diameter of the orifice or throat, [-]
     U_dP : float
-        Relative uncertainty of the measured differential pressure, [%]
+        Relative uncertainty of the measured differential pressure, [-]
     U_rho : float
         Relative uncertainty of the density of the fluid at the upstream
-        pressure tapping, [%]
+        pressure tapping, [-]
     U_additional : float
         Sum of any additional relative uncertainties which the applicable part
         of ISO 5167 requires to be added arithmetically, for example for
-        shortened straight lengths; zero if there are none, [%]
+        shortened straight lengths; zero if there are none, [-]
 
     Returns
     -------
     U_m : float
-        Relative uncertainty of the mass flow rate, [%]
+        Relative uncertainty of the mass flow rate, [-]
 
     Notes
     -----
-    Every input is required; no value is assumed for any of them. All of
-    them should be at the same level of confidence, which in ISO 5167 is
-    about 95 %; the result is then at that level too.
+    All inputs and the result are fractions, not percent; as the formula is
+    homogeneous, inputs in percent would give a result in percent. Every
+    input is required; no value is assumed for any of them. All of them
+    should be at the same level of confidence, which in ISO 5167 is about
+    95 %; the result is then at that level too.
 
     The formula treats the uncertainties of `C`, `epsilon`, `Do`, `dP` and
     `rho` as independent, and neglects covariance terms; [1]_ states that
@@ -1170,7 +1172,7 @@ def mass_flow_uncertainty_ISO_5167_1_2003(beta: float, U_C: float, U_epsilon: fl
     isentropic exponent is covered by their own uncertainties.
 
     [1]_ gives the largest values of `U_D` and `U_Do` that follow from the
-    tolerances of ISO 5167 as 0.4 % and 0.1 % respectively; smaller actual
+    tolerances of ISO 5167 as 0.004 and 0.001 respectively; smaller actual
     values may be used instead. The uncertainties of `dP` and `rho` must be
     determined by the user, including any part stated by an instrument
     manufacturer as a percentage of full scale.
@@ -1180,9 +1182,9 @@ def mass_flow_uncertainty_ISO_5167_1_2003(beta: float, U_C: float, U_epsilon: fl
 
     Examples
     --------
-    >>> mass_flow_uncertainty_ISO_5167_1_2003(beta=0.5, U_C=0.5, U_epsilon=0.1,
-    ... U_D=0.4, U_Do=0.1, U_dP=0.5, U_rho=0.2, U_additional=0.0)
-    0.617134957327
+    >>> mass_flow_uncertainty_ISO_5167_1_2003(beta=0.5, U_C=0.005, U_epsilon=0.001,
+    ... U_D=0.004, U_Do=0.001, U_dP=0.005, U_rho=0.002, U_additional=0.0)
+    0.006171349573
 
     References
     ----------
