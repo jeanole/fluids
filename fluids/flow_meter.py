@@ -58,7 +58,7 @@ Nozzle Flow Meters
 .. autofunction:: C_venturi_nozzle
 .. autofunction:: nozzle_expansibility
 .. autofunction:: ISA_1932_nozzle_validity_ISO_5167_3_2022
-.. autofunction:: ISA_1932_nozzle_C_uncertainty_ISO_5167_3_2022
+.. autofunction:: C_uncertainty_ISA_1932_nozzle_ISO_5167_3_2022
 .. autofunction:: ISA_1932_nozzle_expansibility_uncertainty_ISO_5167_3_2022
 
 Venturi Tube Meters
@@ -110,10 +110,10 @@ __all__: list[str] = [
     "C_eccentric_orifice_ISO_15377_1998",
     "C_long_radius_nozzle",
     "C_quarter_circle_orifice_ISO_15377_1998",
+    "C_uncertainty_ISA_1932_nozzle_ISO_5167_3_2022",
     "C_venturi_nozzle",
     "C_wedge_meter_ISO_5167_6_2017",
     "C_wedge_meter_Miller",
-    "ISA_1932_nozzle_C_uncertainty_ISO_5167_3_2022",
     "ISA_1932_nozzle_expansibility_uncertainty_ISO_5167_3_2022",
     "ISA_1932_nozzle_validity_ISO_5167_3_2022",
     "K_to_discharge_coefficient",
@@ -1683,16 +1683,16 @@ def ISA_1932_nozzle_validity_ISO_5167_3_2022(D: float, Do: float, Re_D: float | 
     return checks
 
 
-def ISA_1932_nozzle_C_uncertainty_ISO_5167_3_2022(D: float, Do: float) -> float:
-    r"""Calculates the relative expanded uncertainty of the discharge
-    coefficient of an ISA 1932 nozzle calculated with
+def C_uncertainty_ISA_1932_nozzle_ISO_5167_3_2022(D: float, Do: float) -> float:
+    r"""Calculates the relative uncertainty of the discharge coefficient of
+    an ISA 1932 nozzle calculated with
     :obj:`C_ISA_1932_nozzle`, according to [1]_.
 
     .. math::
-        U_C = 0.8 \text{ for } \beta \le 0.6
+        U_C = 0.008 \text{ for } \beta \le 0.6
 
     .. math::
-        U_C = 2\beta - 0.4 \text{ for } \beta > 0.6
+        U_C = 0.02\beta - 0.004 \text{ for } \beta > 0.6
 
     Parameters
     ----------
@@ -1704,13 +1704,14 @@ def ISA_1932_nozzle_C_uncertainty_ISO_5167_3_2022(D: float, Do: float) -> float:
     Returns
     -------
     U_C : float
-        Relative expanded uncertainty of the coefficient of discharge of the
-        nozzle, [%]
+        Relative uncertainty of the coefficient of discharge of the nozzle,
+        [-]
 
     Notes
     -----
-    [1]_ gives this uncertainty at a coverage factor of 2, approximately a
-    95 % level of confidence, on the assumption that the diameter ratio, the
+    [1]_ gives this uncertainty in percent, as an expanded uncertainty with a
+    coverage factor of 2 (a level of confidence of about 95 %); it is
+    returned here as a fraction. It assumes that the diameter ratio, the
     pipe diameter, the Reynolds number and the relative roughness are known
     without error. It applies only within the limits of use checked by
     :obj:`ISA_1932_nozzle_validity_ISO_5167_3_2022`; no check of this is
@@ -1718,8 +1719,8 @@ def ISA_1932_nozzle_C_uncertainty_ISO_5167_3_2022(D: float, Do: float) -> float:
 
     Examples
     --------
-    >>> ISA_1932_nozzle_C_uncertainty_ISO_5167_3_2022(D=0.1, Do=0.07)
-    1.0
+    >>> C_uncertainty_ISA_1932_nozzle_ISO_5167_3_2022(D=0.1, Do=0.07)
+    0.01
 
     References
     ----------
@@ -1729,17 +1730,17 @@ def ISA_1932_nozzle_C_uncertainty_ISO_5167_3_2022(D: float, Do: float) -> float:
     """
     beta = Do/D
     if beta <= 0.6:
-        return 0.8
-    return 2.0*beta - 0.4
+        return 0.008
+    return 0.02*beta - 0.004
 
 
 def ISA_1932_nozzle_expansibility_uncertainty_ISO_5167_3_2022(P1: float, P2: float) -> float:
-    r"""Calculates the relative expanded uncertainty of the expansibility
-    factor of an ISA 1932 nozzle calculated with :obj:`nozzle_expansibility`,
+    r"""Calculates the relative uncertainty of the expansibility factor of
+    an ISA 1932 nozzle calculated with :obj:`nozzle_expansibility`,
     according to [1]_.
 
     .. math::
-        U_\epsilon = 2\frac{\Delta P}{P_1}
+        U_\epsilon = 0.02\frac{\Delta P}{P_1}
 
     Parameters
     ----------
@@ -1753,12 +1754,13 @@ def ISA_1932_nozzle_expansibility_uncertainty_ISO_5167_3_2022(P1: float, P2: flo
     Returns
     -------
     U_epsilon : float
-        Relative expanded uncertainty of the expansibility factor, [%]
+        Relative uncertainty of the expansibility factor, [-]
 
     Notes
     -----
-    [1]_ gives this uncertainty at a coverage factor of 2, approximately a
-    95 % level of confidence. Unlike that of an orifice plate it does not
+    [1]_ gives this uncertainty in percent, as an expanded uncertainty with a
+    coverage factor of 2 (a level of confidence of about 95 %); it is
+    returned here as a fraction. Unlike that of an orifice plate it does not
     depend on the isentropic exponent.
 
     The expansibility factor of a liquid is exactly 1 and has no
@@ -1767,7 +1769,7 @@ def ISA_1932_nozzle_expansibility_uncertainty_ISO_5167_3_2022(P1: float, P2: flo
     Examples
     --------
     >>> ISA_1932_nozzle_expansibility_uncertainty_ISO_5167_3_2022(P1=1E5, P2=9E4)
-    0.2
+    0.002
 
     References
     ----------
@@ -1775,7 +1777,7 @@ def ISA_1932_nozzle_expansibility_uncertainty_ISO_5167_3_2022(P1: float, P2: flo
        Differential Devices Inserted in Circular Cross-Section Conduits Running
        Full -- Part 3: Nozzles and Venturi Nozzles. Clause 5.1.7.2.
     """
-    return 2.0*(P1 - P2)/P1
+    return 0.02*(P1 - P2)/P1
 
 
 def C_venturi_nozzle(D: float, Do: float) -> float:

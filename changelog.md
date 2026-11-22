@@ -5,7 +5,7 @@
 ### Added
 
 - CI: Added Python 3.15 and 3.15t (free-threaded) to the test matrix.
-- `ISA_1932_nozzle_validity_ISO_5167_3_2022`, `ISA_1932_nozzle_C_uncertainty_ISO_5167_3_2022` and
+- `ISA_1932_nozzle_validity_ISO_5167_3_2022`, `C_uncertainty_ISA_1932_nozzle_ISO_5167_3_2022` and
   `ISA_1932_nozzle_expansibility_uncertainty_ISO_5167_3_2022`: limits of use and uncertainties of the ISA 1932
   nozzle according to ISO 5167-3:2022.
 

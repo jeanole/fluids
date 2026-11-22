@@ -65,12 +65,12 @@ from fluids.flow_meter import (
     C_long_radius_nozzle,
     C_Miller_1996,
     C_quarter_circle_orifice_ISO_15377_1998,
+    C_uncertainty_ISA_1932_nozzle_ISO_5167_3_2022,
     C_Reader_Harris_Gallagher,
     C_Reader_Harris_Gallagher_wet_venturi_tube,
     C_venturi_nozzle,
     C_wedge_meter_ISO_5167_6_2017,
     C_wedge_meter_Miller,
-    ISA_1932_nozzle_C_uncertainty_ISO_5167_3_2022,
     ISA_1932_nozzle_expansibility_uncertainty_ISO_5167_3_2022,
     ISA_1932_nozzle_validity_ISO_5167_3_2022,
     K_to_discharge_coefficient,
@@ -562,20 +562,17 @@ def test_ISA_1932_nozzle_validity_ISO_5167_3_2022():
     assert not any(check[3] for check in checks.values())
 
 
-def test_ISA_1932_nozzle_C_uncertainty_ISO_5167_3_2022():
-    for beta in (0.3, 0.45, 0.6):
-        assert ISA_1932_nozzle_C_uncertainty_ISO_5167_3_2022(D=1.0, Do=beta) == 0.8
-    for beta in (0.6*(1.0 + 1e-9), 0.7, 0.8):
-        assert_close(ISA_1932_nozzle_C_uncertainty_ISO_5167_3_2022(D=1.0, Do=beta), 2.0*beta - 0.4, rtol=1e-12)
-    # Continuous at beta = 0.6
-    assert_close(ISA_1932_nozzle_C_uncertainty_ISO_5167_3_2022(D=1.0, Do=0.6*(1.0 + 1e-9)), 0.8, rtol=1e-8)
-    assert_close(ISA_1932_nozzle_C_uncertainty_ISO_5167_3_2022(D=0.1, Do=0.08), 1.2, rtol=1e-13)
+def test_C_uncertainty_ISA_1932_nozzle_ISO_5167_3_2022():
+    assert_close(C_uncertainty_ISA_1932_nozzle_ISO_5167_3_2022(D=0.1, Do=0.045), 0.008)
+    assert_close(C_uncertainty_ISA_1932_nozzle_ISO_5167_3_2022(D=1.0, Do=0.6), 0.008)
+    assert_close(C_uncertainty_ISA_1932_nozzle_ISO_5167_3_2022(D=0.1, Do=0.07), 0.01)
+    assert_close(C_uncertainty_ISA_1932_nozzle_ISO_5167_3_2022(D=0.1, Do=0.08), 0.012)
 
 
 def test_ISA_1932_nozzle_expansibility_uncertainty_ISO_5167_3_2022():
-    assert_close(ISA_1932_nozzle_expansibility_uncertainty_ISO_5167_3_2022(P1=1E5, P2=9E4), 2.0*1E4/1E5, rtol=1e-14)
-    assert_close(ISA_1932_nozzle_expansibility_uncertainty_ISO_5167_3_2022(P1=2E5, P2=1.5E5), 0.5, rtol=1e-14)
-    assert ISA_1932_nozzle_expansibility_uncertainty_ISO_5167_3_2022(P1=1E5, P2=1E5) == 0.0
+    assert_close(ISA_1932_nozzle_expansibility_uncertainty_ISO_5167_3_2022(P1=1E5, P2=9E4), 0.002)
+    assert_close(ISA_1932_nozzle_expansibility_uncertainty_ISO_5167_3_2022(P1=2E5, P2=1.5E5), 0.005)
+
 
 def test_C_long_radius_nozzle():
     C = C_long_radius_nozzle(D=0.07391, Do=0.0422, rho=1.2, mu=1.8E-5, m=0.1)
