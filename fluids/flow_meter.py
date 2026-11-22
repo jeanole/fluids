@@ -721,8 +721,8 @@ def orifice_validity_ISO_5167_2_2022(D: float, Do: float, taps: str="corner", Re
     ----------
     .. [1] ISO 5167-2:2022 - Measurement of Fluid Flow by Means of Pressure
        Differential Devices Inserted in Circular Cross-Section Conduits Running
-       Full -- Part 2: Orifice Plates. Clause 5.3.1, Limits of use, and
-       clause 5.3.2.2.
+       Full -- Part 2: Orifice Plates. Clause 1 (Scope), clause 5.1.8.1,
+       clause 5.3.1 (Limits of use) and clause 5.3.2.2.
     """
     beta = Do/D
     checks: dict = {
