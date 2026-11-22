@@ -644,7 +644,8 @@ def orifice_validity_ISO_5167_2_2022(D: float, Do: float, taps: str="corner", Re
         Re_D \ge 5000 \text{ and } Re_D \ge 170000\beta^2 D
 
     For compressible fluids, the limit of the expansibility equation
-    (:obj:`orifice_expansibility`) is also checked:
+    (:obj:`orifice_expansibility`), which is given in clause 5.3.2.2 of [1]_
+    and not with the other limits, is also checked:
 
     .. math::
         \frac{P_2}{P_1} \ge 0.75
@@ -720,7 +721,8 @@ def orifice_validity_ISO_5167_2_2022(D: float, Do: float, taps: str="corner", Re
     ----------
     .. [1] ISO 5167-2:2022 - Measurement of Fluid Flow by Means of Pressure
        Differential Devices Inserted in Circular Cross-Section Conduits Running
-       Full -- Part 2: Orifice Plates. Clause 5.3.1, Limits of use.
+       Full -- Part 2: Orifice Plates. Clause 5.3.1, Limits of use, and
+       clause 5.3.2.2.
     """
     beta = Do/D
     checks: dict = {
