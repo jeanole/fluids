@@ -5,6 +5,9 @@
 ### Added
 
 - CI: Added Python 3.15 and 3.15t (free-threaded) to the test matrix.
+- `C_uncertainty_orifice_ISO_5167_2_2022` and `orifice_expansibility_uncertainty_ISO_5167_2_2022`: relative
+  uncertainty of the discharge coefficient and expansibility factor of an orifice plate according to
+  ISO 5167-2:2022.
 
 ### Changed
 

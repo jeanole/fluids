@@ -49,6 +49,8 @@ Orifice Plate Correlations
 .. autofunction:: C_Miller_1996
 .. autofunction:: orifice_expansibility
 .. autofunction:: orifice_expansibility_1989
+.. autofunction:: C_uncertainty_orifice_ISO_5167_2_2022
+.. autofunction:: orifice_expansibility_uncertainty_ISO_5167_2_2022
 .. autodata:: ISO_15377_CONICAL_ORIFICE_C
 
 Nozzle Flow Meters
@@ -107,6 +109,7 @@ __all__: list[str] = [
     "C_eccentric_orifice_ISO_15377_1998",
     "C_long_radius_nozzle",
     "C_quarter_circle_orifice_ISO_15377_1998",
+    "C_uncertainty_orifice_ISO_5167_2_2022",
     "C_venturi_nozzle",
     "C_wedge_meter_ISO_5167_6_2017",
     "C_wedge_meter_Miller",
@@ -130,6 +133,7 @@ __all__: list[str] = [
     "nozzle_expansibility",
     "orifice_expansibility",
     "orifice_expansibility_1989",
+    "orifice_expansibility_uncertainty_ISO_5167_2_2022",
     "velocity_of_approach_factor",
 ]
 
@@ -424,6 +428,154 @@ def orifice_expansibility_1989(D: float, Do: float, P1: float, P2: float, k: flo
     beta_ratio_4 = beta_ratio_4*beta_ratio_4
     beta_ratio_4 = beta_ratio_4*beta_ratio_4
     return 1.0 - (0.41 + 0.35*beta_ratio_4)*(P1 - P2)/(k*P1)
+
+
+def C_uncertainty_orifice_ISO_5167_2_2022(D: float, Do: float, Re_D: float) -> float:
+    r"""Calculates the relative uncertainty of the discharge coefficient of an
+    orifice plate calculated with the Reader-Harris/Gallagher equation
+    (:obj:`C_Reader_Harris_Gallagher`), according to [1]_.
+
+    The base uncertainty depends on the diameter ratio only:
+
+    .. math::
+        U_C = 0.007 - 0.01\beta \text{ for } 0.1 \le \beta < 0.2
+
+    .. math::
+        U_C = 0.005 \text{ for } 0.2 \le \beta \le 0.6
+
+    .. math::
+        U_C = 0.01667\beta - 0.005 \text{ for } 0.6 < \beta \le 0.75
+
+    If D < 71.12 mm (2.8 in.), the following is added to it:
+
+    .. math::
+        U_C \mathrel{+}= 0.009(0.75 - \beta)\left(2.8 - \frac{D}{0.0254}\right)
+
+    If :math:`\beta > 0.5` and :math:`Re_D < 10000`, the following is added
+    to it as well:
+
+    .. math::
+        U_C \mathrel{+}= 0.005
+
+    Parameters
+    ----------
+    D : float
+        Upstream internal pipe diameter, [m]
+    Do : float
+        Diameter of orifice at flow conditions, [m]
+    Re_D : float
+        Reynolds number of the fluid with respect to the upstream pipe
+        diameter `D`, [-]
+
+    Returns
+    -------
+    U_C : float
+        Relative uncertainty of the coefficient of discharge of the orifice,
+        [-]
+
+    Notes
+    -----
+    [1]_ gives these values in percent; they are returned here as fractions.
+    The additional terms are added arithmetically, as in [1]_. The base
+    uncertainty as a function of diameter ratio is also given and discussed
+    in [2]_.
+
+    This uncertainty applies only when the orifice is within the limits of
+    use of [1]_ and is manufactured and installed according to it; no check
+    of this is made. For diameter ratios under 0.1 or above 0.75 the nearest
+    of the above expressions is evaluated, which is an extrapolation.
+
+    It is the uncertainty of `C` alone, on the assumption that `D`, `Do` and
+    `Re_D` are known without error. Like all uncertainties in ISO 5167, it is
+    given for a level of confidence of about 95 % [3]_.
+
+    Examples
+    --------
+    >>> C_uncertainty_orifice_ISO_5167_2_2022(D=0.07391, Do=0.0222, Re_D=1E5)
+    0.005
+    >>> C_uncertainty_orifice_ISO_5167_2_2022(D=0.06, Do=0.042, Re_D=8000.0)
+    0.011866007874
+
+    References
+    ----------
+    .. [1] ISO 5167-2:2022 - Measurement of Fluid Flow by Means of Pressure
+       Differential Devices Inserted in Circular Cross-Section Conduits Running
+       Full -- Part 2: Orifice Plates. Clause 5.3.3, Uncertainties
+       (5.3.3.1).
+    .. [2] Reader-Harris, Michael, Claire Forsyth, and Tariq Boussouara. "The
+       Calculation of the Uncertainty of the Orifice-Plate Discharge
+       Coefficient." Flow Measurement and Instrumentation 82 (December 1,
+       2021): 102043. https://doi.org/10.1016/j.flowmeasinst.2021.102043.
+    .. [3] ISO 5167-1:2003 - Measurement of Fluid Flow by Means of Pressure
+       Differential Devices Inserted in Circular Cross-Section Conduits Running
+       Full -- Part 1: General Principles and Requirements. Clause 8.1.
+    """
+    beta = Do/D
+    if beta < 0.2:
+        U_C = 0.007 - 0.01*beta
+    elif beta <= 0.6:
+        U_C = 0.005
+    else:
+        U_C = 0.01667*beta - 0.005
+    if D < 0.07112:
+        U_C += 0.009*(0.75 - beta)*(2.8 - D*inch_inv)
+    if beta > 0.5 and Re_D < 10000.0:
+        U_C += 0.005
+    return U_C
+
+
+def orifice_expansibility_uncertainty_ISO_5167_2_2022(P1: float, P2: float, k: float) -> float:
+    r"""Calculates the relative uncertainty of the expansibility factor of an
+    orifice plate calculated with :obj:`orifice_expansibility`, according to
+    [1]_.
+
+    .. math::
+        U_\epsilon = 0.035\frac{\Delta P}{\kappa P_1}
+
+    Parameters
+    ----------
+    P1 : float
+        Static pressure of fluid upstream of orifice at the cross-section of
+        the pressure tap, [Pa]
+    P2 : float
+        Static pressure of fluid downstream of orifice at the cross-section of
+        the pressure tap, [Pa]
+    k : float
+        Isentropic exponent of fluid, [-]
+
+    Returns
+    -------
+    U_epsilon : float
+        Relative uncertainty of the expansibility factor, [-]
+
+    Notes
+    -----
+    [1]_ gives this value in percent; it is returned here as a fraction.
+
+    The expansibility factor of a liquid is exactly 1 and has no uncertainty;
+    as with :obj:`orifice_expansibility`, that result is obtained by setting
+    `k` to infinity or to a really high number like 1E20.
+
+    The expression assumes that `P1`, `P2` and `k` are known without error,
+    and applies only within the limits of use of [1]_. Like all uncertainties
+    in ISO 5167, it is given for a level of confidence of about 95 % [2]_.
+
+    Examples
+    --------
+    >>> orifice_expansibility_uncertainty_ISO_5167_2_2022(P1=1E5, P2=9.9E4, k=1.4)
+    0.00025
+
+    References
+    ----------
+    .. [1] ISO 5167-2:2022 - Measurement of Fluid Flow by Means of Pressure
+       Differential Devices Inserted in Circular Cross-Section Conduits Running
+       Full -- Part 2: Orifice Plates. Clause 5.3.3, Uncertainties
+       (5.3.3.2).
+    .. [2] ISO 5167-1:2003 - Measurement of Fluid Flow by Means of Pressure
+       Differential Devices Inserted in Circular Cross-Section Conduits Running
+       Full -- Part 1: General Principles and Requirements. Clause 8.1.
+    """
+    return 0.035*(P1 - P2)/(k*P1)
 
 
 def C_Reader_Harris_Gallagher(D: float, Do: float, rho: float, mu: float, m: float, taps: str="corner") -> float:
