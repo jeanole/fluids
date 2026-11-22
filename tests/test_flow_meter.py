@@ -74,6 +74,8 @@ from fluids.flow_meter import (
     cone_meter_expansibility_Stewart,
     diameter_ratio_cone_meter,
     diameter_ratio_wedge_meter,
+    cavitation_inception_orifice_Cairns_2000,
+    cavitation_parameter_orifice,
     differential_pressure_meter_beta,
     differential_pressure_meter_C_epsilon,
     differential_pressure_meter_dP,
@@ -483,6 +485,35 @@ def test_C_quarter_circle_orifice_ISO_15377_1998():
     for Do, C_expect in zip(betas, Cs_expect):
         C = C_quarter_circle_orifice_ISO_15377_1998(D=1, Do=Do)
         assert (round(C, 3) == C_expect)
+
+def test_cavitation_parameter_orifice():
+    # Direct evaluation of the definition
+    assert_close(cavitation_parameter_orifice(P1=5E5, P2=3E5, Psat=3E3), 2E5/(5E5 - 3E3), rtol=1e-14)
+    # No pressure difference, no cavitation potential
+    assert cavitation_parameter_orifice(P1=5E5, P2=5E5, Psat=3E3) == 0.0
+    # Downstream pressure at the vapour pressure gives exactly 1
+    assert cavitation_parameter_orifice(P1=5E5, P2=3E3, Psat=3E3) == 1.0
+    # Reciprocal of the control valve cavitation index
+    from fluids.control_valve import cavitation_index
+    assert_close(cavitation_parameter_orifice(P1=1E6, P2=8E5, Psat=2E5), 1.0/cavitation_index(1E6, 8E5, 2E5), rtol=1e-14)
+
+
+def test_cavitation_inception_orifice_Cairns_2000():
+    # The four tested diameter ratios of the paper
+    for beta in (0.30, 0.40, 0.54, 0.70):
+        assert_close(cavitation_inception_orifice_Cairns_2000(D=0.1025, Do=0.1025*beta), -0.67*beta + 0.70, rtol=1e-13)
+    assert_close(cavitation_inception_orifice_Cairns_2000(D=1.0, Do=0.3), 0.499, rtol=1e-13)
+    assert_close(cavitation_inception_orifice_Cairns_2000(D=1.0, Do=0.7), 0.231, rtol=1e-13)
+    # Depends only on the diameter ratio
+    assert_close(cavitation_inception_orifice_Cairns_2000(D=0.2, Do=0.1),
+                 cavitation_inception_orifice_Cairns_2000(D=0.05, Do=0.025), rtol=1e-14)
+    # Larger bores cavitate earlier, at lower values of the parameter
+    assert cavitation_inception_orifice_Cairns_2000(D=0.1, Do=0.07) < cavitation_inception_orifice_Cairns_2000(D=0.1, Do=0.03)
+
+    # Use together: cavitating when the parameter exceeds the inception value
+    X_Fz = cavitation_inception_orifice_Cairns_2000(D=0.1025, Do=0.05535)
+    assert cavitation_parameter_orifice(P1=30E5, P2=25E5, Psat=3E3) < X_Fz
+    assert cavitation_parameter_orifice(P1=30E5, P2=15E5, Psat=3E3) > X_Fz
 
 def test_K_to_discharge_coefficient():
     C = K_to_discharge_coefficient(D=0.07366, Do=0.05, K=5.2314291729754)

@@ -5,6 +5,8 @@
 ### Added
 
 - CI: Added Python 3.15 and 3.15t (free-threaded) to the test matrix.
+- `cavitation_parameter_orifice` and `cavitation_inception_orifice_Cairns_2000`: the cavitation parameter of a
+  liquid flowing through an orifice plate, and its value at the onset of cavitation from Cairns et al. (2000).
 
 ### Changed
 
