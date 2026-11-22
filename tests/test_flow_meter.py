@@ -20,7 +20,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from math import log, log10
+from math import inf, log, log10, pi
 
 import pytest
 
@@ -89,6 +89,7 @@ from fluids.flow_meter import (
     nozzle_expansibility,
     orifice_expansibility,
     orifice_expansibility_1989,
+    orifice_validity_ISO_5167_2_2022,
     velocity_of_approach_factor,
 )
 import fluids.flow_meter as flow_meter_module
@@ -132,6 +133,97 @@ def test_C_Reader_Harris_Gallagher():
     C1 = C_Reader_Harris_Gallagher(D=0.07112, **kwargs)
     C2 = C_Reader_Harris_Gallagher(D=0.07112-1e-13, **kwargs)
     assert_close(C1, C2)
+
+def test_orifice_validity_ISO_5167_2_2022():
+    # Nominal case, everything in range; expectations evaluated directly
+    D, Do, m, mu = 0.07391, 0.0222, 0.12, 1.85E-5
+    checks = orifice_validity_ISO_5167_2_2022(D=D, Do=Do, taps="flange", m=m, mu=mu, P1=1E5, P2=9.9E4)
+    assert list(checks.keys()) == ["D", "Do", "beta", "Re_D", "P2/P1"]
+    assert checks["D"] == (D, 0.05, 1.0, True)
+    assert checks["Do"] == (Do, 0.0125, inf, True)
+    assert checks["beta"][1:] == (0.1, 0.75, True)
+    assert_close(checks["beta"][0], 0.0222/0.07391, rtol=1e-14)
+    assert_close(checks["Re_D"][0], 4.0*0.12/(pi*0.07391*1.85E-5), rtol=1e-14)
+    assert checks["Re_D"][1:] == (5000.0, inf, True)
+    assert_close(checks["P2/P1"][0], 0.99, rtol=1e-14)
+    assert checks["P2/P1"][1:] == (0.75, inf, True)
+    assert all(check[3] for check in checks.values())
+
+    # Only the checks which can be evaluated are returned
+    assert list(orifice_validity_ISO_5167_2_2022(D=0.1, Do=0.05).keys()) == ["D", "Do", "beta"]
+    assert "Re_D" not in orifice_validity_ISO_5167_2_2022(D=0.1, Do=0.05, m=1.0)
+    assert "Re_D" not in orifice_validity_ISO_5167_2_2022(D=0.1, Do=0.05, mu=1e-3)
+    assert "P2/P1" not in orifice_validity_ISO_5167_2_2022(D=0.1, Do=0.05, P1=1e5)
+    assert "P2/P1" not in orifice_validity_ISO_5167_2_2022(D=0.1, Do=0.05, P2=1e5)
+
+    # A given Re_D is used in preference to m and mu
+    checks = orifice_validity_ISO_5167_2_2022(D=0.1, Do=0.05, Re_D=1e5, m=1.0, mu=1e-3)
+    assert checks["Re_D"][0] == 1e5
+
+    # Pipe diameter limits, inclusive
+    for D, expect in [(0.05, True), (0.05*(1.0 - 1e-12), False), (1.0, True), (1.0 + 1e-12, False)]:
+        assert orifice_validity_ISO_5167_2_2022(D=D, Do=0.4*D)["D"][3] is expect
+
+    # Bore diameter limit, inclusive
+    for Do, expect in [(0.0125, True), (0.0125*(1.0 - 1e-12), False)]:
+        assert orifice_validity_ISO_5167_2_2022(D=0.1, Do=Do)["Do"][3] is expect
+
+    # Diameter ratio limits, inclusive
+    for Do, expect in [(0.05, True), (0.05*(1.0 - 1e-12), False), (0.375, True), (0.375*(1.0 + 1e-12), False)]:
+        assert orifice_validity_ISO_5167_2_2022(D=0.5, Do=Do)["beta"][3] is expect
+
+    # Nothing is raised for nonsense geometry; it is only reported
+    checks = orifice_validity_ISO_5167_2_2022(D=0.01, Do=0.009, Re_D=10.0, P1=1e5, P2=1e4)
+    assert len(checks) == 5
+    assert not any(check[3] for check in checks.values())
+
+    # Reynolds number limit for corner and D and D/2 taps - both branches
+    for taps in ("corner", "D", "D/2", ORIFICE_CORNER_TAPS, ORIFICE_D_AND_D_2_TAPS):
+        # beta = 0.5 and exactly 0.56 use the constant limit
+        for Do in (0.25, 0.28):
+            assert Do/0.5 <= 0.56
+            checks = orifice_validity_ISO_5167_2_2022(D=0.5, Do=Do, taps=taps, Re_D=5000.0)
+            assert checks["Re_D"] == (5000.0, 5000.0, inf, True)
+            checks = orifice_validity_ISO_5167_2_2022(D=0.5, Do=Do, taps=taps, Re_D=4999.99)
+            assert checks["Re_D"] == (4999.99, 5000.0, inf, False)
+
+        # beta = 0.7 uses the beta-dependent limit
+        Re_D_min = 16000.0*(0.35/0.5)**2
+        assert Re_D_min > 5000.0
+        checks = orifice_validity_ISO_5167_2_2022(D=0.5, Do=0.35, taps=taps, Re_D=Re_D_min)
+        assert_close(checks["Re_D"][1], Re_D_min, rtol=1e-14)
+        assert checks["Re_D"][3] is True
+        checks = orifice_validity_ISO_5167_2_2022(D=0.5, Do=0.35, taps=taps, Re_D=Re_D_min*(1.0 - 1e-9))
+        assert checks["Re_D"][3] is False
+        assert orifice_validity_ISO_5167_2_2022(D=0.5, Do=0.35, taps=taps, Re_D=5000.0)["Re_D"][3] is False
+
+    # Reynolds number limit for flange taps - both branches
+    # Small pipe, small beta: the constant limit governs
+    assert 170000.0*(0.02/0.1)**2*0.1 < 5000.0
+    checks = orifice_validity_ISO_5167_2_2022(D=0.1, Do=0.02, taps=ORIFICE_FLANGE_TAPS, Re_D=5000.0)
+    assert checks["Re_D"] == (5000.0, 5000.0, inf, True)
+    assert orifice_validity_ISO_5167_2_2022(D=0.1, Do=0.02, taps="flange", Re_D=4999.99)["Re_D"][3] is False
+
+    # Large pipe, large beta: the diameter-dependent limit governs
+    Re_D_min = 170.0*(0.35/0.5)**2*500.0 # D in mm as written in the standard
+    assert Re_D_min > 5000.0
+    checks = orifice_validity_ISO_5167_2_2022(D=0.5, Do=0.35, taps="flange", Re_D=Re_D_min*(1.0 + 1e-9))
+    assert_close(checks["Re_D"][1], Re_D_min, rtol=1e-13)
+    assert checks["Re_D"][3] is True
+    assert orifice_validity_ISO_5167_2_2022(D=0.5, Do=0.35, taps="flange", Re_D=Re_D_min*(1.0 - 1e-9))["Re_D"][3] is False
+    # Passes the corner tap limit but not the flange tap one
+    assert orifice_validity_ISO_5167_2_2022(D=0.5, Do=0.35, taps="corner", Re_D=1e4)["Re_D"][3] is True
+    assert orifice_validity_ISO_5167_2_2022(D=0.5, Do=0.35, taps="flange", Re_D=1e4)["Re_D"][3] is False
+
+    # Pressure ratio limit for gases, inclusive; omitted for liquids
+    assert orifice_validity_ISO_5167_2_2022(D=0.1, Do=0.05, P1=1e5, P2=0.75e5)["P2/P1"] == (0.75, 0.75, inf, True)
+    assert orifice_validity_ISO_5167_2_2022(D=0.1, Do=0.05, P1=1e5, P2=0.7499e5)["P2/P1"][3] is False
+    liquid = orifice_validity_ISO_5167_2_2022(D=0.1, Do=0.05, m=5.0, mu=1e-3)
+    assert list(liquid.keys()) == ["D", "Do", "beta", "Re_D"]
+    assert_close(liquid["Re_D"][0], 4.0*5.0/(pi*0.1*1e-3), rtol=1e-14)
+
+    with pytest.raises(ValueError):
+        orifice_validity_ISO_5167_2_2022(D=0.1, Do=0.05, taps="NOTALOCATION")
 
 def test_C_Miller_1996():
     C_flange_ISO = C_Reader_Harris_Gallagher(D=0.07391, Do=0.0222, rho=1.165, mu=1.85E-5, m=0.12, taps="flange")
