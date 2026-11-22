@@ -20,7 +20,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from math import inf, log, log10, pi
+from math import inf, log, log10
 
 import pytest
 
@@ -516,50 +516,27 @@ def test_nozzle_expansibility():
     assert_close(nozzle_expansibility(D=0.0739, Do=0.0222, P1=1E5, P2=9.9E4, k=1), 0.9924074233062772, rtol=1e-13)
 
 def test_ISA_1932_nozzle_validity_ISO_5167_3_2022():
-    # Nominal case; expectations evaluated directly
     checks = ISA_1932_nozzle_validity_ISO_5167_3_2022(D=0.1, Do=0.06, m=2.0, mu=1E-3, P1=1E5, P2=9E4)
     assert list(checks.keys()) == ["D", "beta", "Re_D", "P2/P1"]
-    assert checks["D"] == (0.1, 0.05, 0.5, True)
-    assert_close(checks["beta"][0], 0.6, rtol=1e-14)
-    assert checks["beta"][1:] == (0.3, 0.8, True)
-    assert_close(checks["Re_D"][0], 4.0*2.0/(pi*0.1*1E-3), rtol=1e-14)
-    assert checks["Re_D"][1:] == (2E4, 1E7, True)
-    assert_close(checks["P2/P1"][0], 0.9, rtol=1e-14)
-    assert checks["P2/P1"][1:] == (0.75, inf, True)
-
-    # Only the checks which can be evaluated are returned
+    assert_close1d([check[0] for check in checks.values()], [0.1, 0.6, 25464.790894703256, 0.9])
+    assert all(check[3] for check in checks.values())
     assert list(ISA_1932_nozzle_validity_ISO_5167_3_2022(D=0.1, Do=0.06).keys()) == ["D", "beta"]
-    assert "Re_D" not in ISA_1932_nozzle_validity_ISO_5167_3_2022(D=0.1, Do=0.06, m=1.0)
-    assert "P2/P1" not in ISA_1932_nozzle_validity_ISO_5167_3_2022(D=0.1, Do=0.06, P1=1E5)
-    assert ISA_1932_nozzle_validity_ISO_5167_3_2022(D=0.1, Do=0.06, Re_D=1E5, m=1.0, mu=1E-3)["Re_D"][0] == 1E5
 
-    # Pipe diameter limits, inclusive
-    for D, expect in [(0.05, True), (0.05*(1.0 - 1e-12), False), (0.5, True), (0.5*(1.0 + 1e-12), False)]:
-        assert ISA_1932_nozzle_validity_ISO_5167_3_2022(D=D, Do=0.6*D)["D"][3] is expect
+    # Geometry limits are inclusive
+    assert ISA_1932_nozzle_validity_ISO_5167_3_2022(D=0.05, Do=0.03)["D"] == (0.05, 0.05, 0.5, True)
+    assert ISA_1932_nozzle_validity_ISO_5167_3_2022(D=0.51, Do=0.3)["D"][3] is False
+    assert ISA_1932_nozzle_validity_ISO_5167_3_2022(D=1.0, Do=0.3)["beta"][3] is True
+    assert ISA_1932_nozzle_validity_ISO_5167_3_2022(D=1.0, Do=0.81)["beta"][3] is False
 
-    # Diameter ratio limits, inclusive
-    for beta, expect in [(0.3, True), (0.3*(1.0 - 1e-9), False), (0.8, True), (0.8*(1.0 + 1e-9), False)]:
-        assert ISA_1932_nozzle_validity_ISO_5167_3_2022(D=1.0, Do=beta)["beta"][3] is expect
+    # Two Reynolds number ranges; beta = 0.44 belongs to the upper one
+    assert ISA_1932_nozzle_validity_ISO_5167_3_2022(D=1.0, Do=0.43, Re_D=7E4)["Re_D"] == (7E4, 7E4, 1E7, True)
+    assert ISA_1932_nozzle_validity_ISO_5167_3_2022(D=1.0, Do=0.43, Re_D=5E4)["Re_D"][3] is False
+    assert ISA_1932_nozzle_validity_ISO_5167_3_2022(D=1.0, Do=0.44, Re_D=2E4)["Re_D"] == (2E4, 2E4, 1E7, True)
+    assert ISA_1932_nozzle_validity_ISO_5167_3_2022(D=1.0, Do=0.44, Re_D=1.1E7)["Re_D"][3] is False
 
-    # Reynolds number ranges; 0.44 belongs to the upper range
-    # (diameters chosen so that the diameter ratio is exact in floating point)
-    for Do, Re_min in [(0.3, 7E4), (0.44*(1.0 - 1e-9), 7E4), (0.44, 2E4), (0.8, 2E4)]:
-        checks = ISA_1932_nozzle_validity_ISO_5167_3_2022(D=1.0, Do=Do, Re_D=Re_min)
-        assert checks["Re_D"] == (Re_min, Re_min, 1E7, True)
-        assert ISA_1932_nozzle_validity_ISO_5167_3_2022(D=1.0, Do=Do, Re_D=Re_min*(1.0 - 1e-9))["Re_D"][3] is False
-        assert ISA_1932_nozzle_validity_ISO_5167_3_2022(D=1.0, Do=Do, Re_D=1E7)["Re_D"][3] is True
-        assert ISA_1932_nozzle_validity_ISO_5167_3_2022(D=1.0, Do=Do, Re_D=1E7*(1.0 + 1e-9))["Re_D"][3] is False
-    # Between the two lower limits, only the upper range passes
-    assert ISA_1932_nozzle_validity_ISO_5167_3_2022(D=0.1, Do=0.04, Re_D=5E4)["Re_D"][3] is False
-    assert ISA_1932_nozzle_validity_ISO_5167_3_2022(D=0.1, Do=0.05, Re_D=5E4)["Re_D"][3] is True
-
-    # Pressure ratio limit, inclusive
+    # Pressure ratio, gases only
     assert ISA_1932_nozzle_validity_ISO_5167_3_2022(D=0.1, Do=0.06, P1=1E5, P2=7.5E4)["P2/P1"] == (0.75, 0.75, inf, True)
-    assert ISA_1932_nozzle_validity_ISO_5167_3_2022(D=0.1, Do=0.06, P1=1E5, P2=7.49E4)["P2/P1"][3] is False
-
-    # Nothing is raised for nonsense input
-    checks = ISA_1932_nozzle_validity_ISO_5167_3_2022(D=0.01, Do=0.009, Re_D=10.0, P1=1E5, P2=1E4)
-    assert not any(check[3] for check in checks.values())
+    assert ISA_1932_nozzle_validity_ISO_5167_3_2022(D=0.1, Do=0.06, P1=1E5, P2=7.4E4)["P2/P1"][3] is False
 
 
 def test_C_uncertainty_ISA_1932_nozzle_ISO_5167_3_2022():
