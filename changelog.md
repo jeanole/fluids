@@ -8,6 +8,9 @@
 - `orifice_validity_ISO_5167_2_2022`: reports whether an orifice plate is within the limits of use of the
   Reader-Harris/Gallagher equation in ISO 5167-2:2022 (pipe and bore diameter, diameter ratio, Reynolds
   number by tap type, and pressure ratio for gases).
+- `C_uncertainty_orifice_ISO_5167_2_2022` and `orifice_expansibility_uncertainty_ISO_5167_2_2022`: relative
+  uncertainty of the discharge coefficient and expansibility factor of an orifice plate according to
+  ISO 5167-2:2022.
 
 ### Changed
 

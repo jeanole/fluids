@@ -65,6 +65,7 @@ from fluids.flow_meter import (
     C_long_radius_nozzle,
     C_Miller_1996,
     C_quarter_circle_orifice_ISO_15377_1998,
+    C_uncertainty_orifice_ISO_5167_2_2022,
     C_Reader_Harris_Gallagher,
     C_Reader_Harris_Gallagher_wet_venturi_tube,
     C_venturi_nozzle,
@@ -89,6 +90,7 @@ from fluids.flow_meter import (
     nozzle_expansibility,
     orifice_expansibility,
     orifice_expansibility_1989,
+    orifice_expansibility_uncertainty_ISO_5167_2_2022,
     orifice_validity_ISO_5167_2_2022,
     velocity_of_approach_factor,
 )
@@ -110,6 +112,35 @@ def test_orifice_expansibility_1989():
     # No actual sample points
     epsilon = orifice_expansibility_1989(D=0.0739, Do=0.0222, P1=1E5, P2=9.9E4, k=1.4)
     assert_close(epsilon, 0.9970510687411718)
+
+def test_C_uncertainty_orifice_ISO_5167_2_2022():
+    # Range ends and middle, as plotted for the ISO band in Figure A.1 of
+    # Reader-Harris, Forsyth and Boussouara (2021): 0.6 %, 0.5 %, 0.75 %
+    assert_close(C_uncertainty_orifice_ISO_5167_2_2022(D=0.2, Do=0.02, Re_D=1e6), 0.006)
+    assert_close(C_uncertainty_orifice_ISO_5167_2_2022(D=0.2, Do=0.08, Re_D=1e6), 0.005)
+    assert_close(C_uncertainty_orifice_ISO_5167_2_2022(D=0.2, Do=0.15, Re_D=1e6), 0.0075025)
+
+    # Each branch of the base term
+    assert_close(C_uncertainty_orifice_ISO_5167_2_2022(D=0.2, Do=0.03, Re_D=1e6), 0.0055)
+    assert_close(C_uncertainty_orifice_ISO_5167_2_2022(D=0.2, Do=0.14, Re_D=1e6), 0.006669)
+
+    # Small pipe term, and continuity where it starts
+    assert_close(C_uncertainty_orifice_ISO_5167_2_2022(D=0.06, Do=0.03, Re_D=1e6), 0.0059850393700787395)
+    assert_close(C_uncertainty_orifice_ISO_5167_2_2022(D=0.07112 - 1e-13, Do=0.03556, Re_D=1e6), 0.005)
+
+    # Low Reynolds number term
+    assert_close(C_uncertainty_orifice_ISO_5167_2_2022(D=0.2, Do=0.11, Re_D=9999.0), 0.01)
+    assert_close(C_uncertainty_orifice_ISO_5167_2_2022(D=0.2, Do=0.11, Re_D=1e4), 0.005)
+
+    # All three terms
+    assert_close(C_uncertainty_orifice_ISO_5167_2_2022(D=0.06, Do=0.042, Re_D=8000.0), 0.01186600787401575)
+
+
+def test_orifice_expansibility_uncertainty_ISO_5167_2_2022():
+    assert_close(orifice_expansibility_uncertainty_ISO_5167_2_2022(P1=1E5, P2=9.9E4, k=1.4), 0.00025)
+    assert_close(orifice_expansibility_uncertainty_ISO_5167_2_2022(P1=2E5, P2=1.5E5, k=1.3), 0.006730769230769231)
+    # Liquid
+    assert orifice_expansibility_uncertainty_ISO_5167_2_2022(P1=2E5, P2=1.83E5, k=inf) == 0.0
 
 def test_C_Reader_Harris_Gallagher():
     C = C_Reader_Harris_Gallagher(D=0.07391, Do=0.0222, rho=1.1645909036, mu=0.0000185861753095, m=0.124431876, taps="corner" )
