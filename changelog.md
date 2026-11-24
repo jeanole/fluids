@@ -5,6 +5,9 @@
 ### Added
 
 - CI: Added Python 3.15 and 3.15t (free-threaded) to the test matrix.
+- `orifice_validity_ISO_5167_2_2022`: reports whether an orifice plate is within the limits of use of the
+  Reader-Harris/Gallagher equation in ISO 5167-2:2022 (pipe and bore diameter, diameter ratio, Reynolds
+  number by tap type, and pressure ratio for gases).
 
 ### Changed
 

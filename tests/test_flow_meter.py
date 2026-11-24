@@ -20,7 +20,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from math import log, log10
+from math import inf, log, log10
 
 import pytest
 
@@ -89,6 +89,7 @@ from fluids.flow_meter import (
     nozzle_expansibility,
     orifice_expansibility,
     orifice_expansibility_1989,
+    orifice_validity_ISO_5167_2_2022,
     velocity_of_approach_factor,
 )
 import fluids.flow_meter as flow_meter_module
@@ -132,6 +133,38 @@ def test_C_Reader_Harris_Gallagher():
     C1 = C_Reader_Harris_Gallagher(D=0.07112, **kwargs)
     C2 = C_Reader_Harris_Gallagher(D=0.07112-1e-13, **kwargs)
     assert_close(C1, C2)
+
+def test_orifice_validity_ISO_5167_2_2022():
+    checks = orifice_validity_ISO_5167_2_2022(D=0.07391, Do=0.0222, taps="flange", m=0.12, mu=1.85E-5, P1=1E5, P2=9.9E4)
+    assert list(checks.keys()) == ["D", "Do", "beta", "Re_D", "P2/P1"]
+    assert_close1d([check[0] for check in checks.values()], [0.07391, 0.0222, 0.30036530915978893, 111741.99838972857, 0.99])
+    assert all(check[3] for check in checks.values())
+    assert list(orifice_validity_ISO_5167_2_2022(D=0.1, Do=0.05).keys()) == ["D", "Do", "beta"]
+
+    # Geometry limits are inclusive
+    assert orifice_validity_ISO_5167_2_2022(D=0.05, Do=0.0125)["D"] == (0.05, 0.05, 1.0, True)
+    assert orifice_validity_ISO_5167_2_2022(D=1.0, Do=0.1)["beta"] == (0.1, 0.1, 0.75, True)
+    assert orifice_validity_ISO_5167_2_2022(D=0.0499, Do=0.0124)["D"][3] is False
+    assert orifice_validity_ISO_5167_2_2022(D=0.0499, Do=0.0124)["Do"][3] is False
+    assert orifice_validity_ISO_5167_2_2022(D=1.0, Do=0.76)["beta"][3] is False
+
+    # Reynolds number limits, corner and D and D/2 taps; beta = 0.56 uses 5000
+    assert orifice_validity_ISO_5167_2_2022(D=0.5, Do=0.28, Re_D=5000.0)["Re_D"] == (5000.0, 5000.0, inf, True)
+    assert orifice_validity_ISO_5167_2_2022(D=0.5, Do=0.28, taps="D", Re_D=4999.0)["Re_D"][3] is False
+    assert_close(orifice_validity_ISO_5167_2_2022(D=0.5, Do=0.35, Re_D=1E4)["Re_D"][1], 7839.999999999999)
+
+    # Flange taps
+    assert orifice_validity_ISO_5167_2_2022(D=0.1, Do=0.02, taps="flange", Re_D=5000.0)["Re_D"][1] == 5000.0
+    checks = orifice_validity_ISO_5167_2_2022(D=0.5, Do=0.35, taps="flange", Re_D=1E4)
+    assert_close(checks["Re_D"][1], 41649.99999999999)
+    assert checks["Re_D"][3] is False
+
+    # Pressure ratio, gases only
+    assert orifice_validity_ISO_5167_2_2022(D=0.1, Do=0.05, P1=1E5, P2=7.5E4)["P2/P1"] == (0.75, 0.75, inf, True)
+    assert orifice_validity_ISO_5167_2_2022(D=0.1, Do=0.05, P1=1E5, P2=7.4E4)["P2/P1"][3] is False
+
+    with pytest.raises(ValueError):
+        orifice_validity_ISO_5167_2_2022(D=0.1, Do=0.05, taps="NOTALOCATION")
 
 def test_C_Miller_1996():
     C_flange_ISO = C_Reader_Harris_Gallagher(D=0.07391, Do=0.0222, rho=1.165, mu=1.85E-5, m=0.12, taps="flange")

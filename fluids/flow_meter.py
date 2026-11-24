@@ -44,6 +44,7 @@ Flow Meter Interfaces
 Orifice Plate Correlations
 --------------------------
 .. autofunction:: C_Reader_Harris_Gallagher
+.. autofunction:: orifice_validity_ISO_5167_2_2022
 .. autofunction:: C_eccentric_orifice_ISO_15377_1998
 .. autofunction:: C_quarter_circle_orifice_ISO_15377_1998
 .. autofunction:: C_Miller_1996
@@ -93,7 +94,7 @@ Flow Meter Utilities
 """
 from __future__ import annotations
 
-from math import acos, exp, log, log10, pi, sqrt
+from math import acos, exp, inf, log, log10, pi, sqrt
 
 from fluids.constants import inch, inch_inv, pi_inv, root_two
 from fluids.core import Froude_densimetric
@@ -130,6 +131,7 @@ __all__: list[str] = [
     "nozzle_expansibility",
     "orifice_expansibility",
     "orifice_expansibility_1989",
+    "orifice_validity_ISO_5167_2_2022",
     "velocity_of_approach_factor",
 ]
 
@@ -606,6 +608,147 @@ def C_Reader_Harris_Gallagher(D: float, Do: float, rho: float, mu: float, m: flo
         C += delta_C_diameter
 
     return C
+
+
+def orifice_validity_ISO_5167_2_2022(D: float, Do: float, taps: str="corner", Re_D: float | None=None,
+                                     m: float | None=None, mu: float | None=None,
+                                     P1: float | None=None, P2: float | None=None) -> dict:
+    r"""Checks an orifice plate against the limits of use of the
+    Reader-Harris/Gallagher discharge coefficient equation
+    (:obj:`C_Reader_Harris_Gallagher`) given in [1]_. Nothing is raised for
+    out of range inputs; each limit is reported with the actual value, the
+    permitted range, and whether or not it is satisfied.
+
+    The limits checked for all tap types are:
+
+    .. math::
+        0.05 \text{ m} \le D \le 1 \text{ m}
+
+    .. math::
+        D_o \ge 0.0125 \text{ m}
+
+    .. math::
+        0.1 \le \beta \le 0.75
+
+    For corner taps and D and D/2 taps:
+
+    .. math::
+        Re_D \ge 5000 \text{ for } \beta \le 0.56
+
+    .. math::
+        Re_D \ge 16000\beta^2 \text{ for } \beta > 0.56
+
+    For flange taps, with `D` in m:
+
+    .. math::
+        Re_D \ge 5000 \text{ and } Re_D \ge 170000\beta^2 D
+
+    For compressible fluids, the limit of the expansibility equation
+    (:obj:`orifice_expansibility`), which is given in clause 5.3.2.2 of [1]_
+    and not with the other limits, is also checked:
+
+    .. math::
+        \frac{P_2}{P_1} \ge 0.75
+
+    Parameters
+    ----------
+    D : float
+        Upstream internal pipe diameter, [m]
+    Do : float
+        Diameter of orifice at flow conditions, [m]
+    taps : str, optional
+        The orientation of the taps; one of 'corner', 'flange', 'D', 'D/2',
+        or 'D and D/2', [-]
+    Re_D : float, optional
+        Reynolds number of the fluid with respect to the upstream pipe
+        diameter `D`; if not provided it is calculated from `m` and `mu`
+        when both of them are given, [-]
+    m : float, optional
+        Mass flow rate of fluid through the orifice, [kg/s]
+    mu : float, optional
+        Viscosity of fluid at `P1`, [Pa*s]
+    P1 : float, optional
+        Static pressure of fluid upstream of orifice at the cross-section of
+        the pressure tap; provide for gases only, [Pa]
+    P2 : float, optional
+        Static pressure of fluid downstream of orifice at the cross-section of
+        the pressure tap; provide for gases only, [Pa]
+
+    Returns
+    -------
+    checks : dict[str, tuple[float, float, float, bool]]
+        Dictionary with one entry per limit which could be evaluated; the
+        keys are 'D', 'Do', 'beta', 'Re_D' and 'P2/P1', and each value is a
+        tuple of (actual value, minimum permitted value, maximum permitted
+        value, whether the limit is satisfied). Where there is no maximum,
+        infinity is given in its place. Values are in the same units as the
+        inputs, [-]
+
+    Notes
+    -----
+    The 'Re_D' entry is only present if `Re_D` or both of `m` and `mu` were
+    given; the 'P2/P1' entry is only present if both `P1` and `P2` were given.
+    The pressure ratio limit does not apply to liquids, so `P1` and `P2`
+    should be omitted for them.
+
+    The Reynolds number is calculated as:
+
+    .. math::
+        Re_D = \frac{4m}{\pi D \mu}
+
+    All of the limits are inclusive, and no tolerance is applied to them.
+
+    The standard [1]_ contains further requirements which are **not** checked
+    by this function, among them limits on the pipe roughness, the plate
+    geometry and the straight lengths required upstream and downstream of the
+    plate.
+
+    Whether or not every limit evaluated is satisfied can be found with
+    ``all(check[3] for check in checks.values())``.
+
+    Examples
+    --------
+    >>> checks = orifice_validity_ISO_5167_2_2022(D=0.07391, Do=0.0222,
+    ... taps='flange', m=0.12, mu=1.85E-5, P1=1E5, P2=9.9E4)
+    >>> checks['beta']
+    (0.30036530916, 0.1, 0.75, True)
+    >>> checks['Re_D']
+    (111741.9983897, 5000.0, inf, True)
+    >>> all(check[3] for check in checks.values())
+    True
+
+    References
+    ----------
+    .. [1] ISO 5167-2:2022 - Measurement of Fluid Flow by Means of Pressure
+       Differential Devices Inserted in Circular Cross-Section Conduits Running
+       Full -- Part 2: Orifice Plates. Clause 1 (Scope), clause 5.1.8.1,
+       clause 5.3.1 (Limits of use) and clause 5.3.2.2.
+    """
+    beta = Do/D
+    checks: dict = {
+        "D": (D, 0.05, 1.0, 0.05 <= D <= 1.0),
+        "Do": (Do, 0.0125, inf, Do >= 0.0125),
+        "beta": (beta, 0.1, 0.75, 0.1 <= beta <= 0.75),
+    }
+
+    if taps == "corner" or taps in ("D", "D/2", ORIFICE_D_AND_D_2_TAPS):
+        Re_D_min = 5000.0 if beta <= 0.56 else 16000.0*beta*beta
+    elif taps == "flange":
+        Re_D_min = 170000.0*beta*beta*D
+        if Re_D_min < 5000.0:
+            Re_D_min = 5000.0
+    else:
+        raise ValueError("Unsupported tap location")
+
+    if Re_D is None and m is not None and mu is not None:
+        Re_D = 4.0*m/(pi*D*mu)
+    if Re_D is not None:
+        checks["Re_D"] = (Re_D, Re_D_min, inf, Re_D >= Re_D_min)
+
+    if P1 is not None and P2 is not None:
+        P_ratio = P2/P1
+        checks["P2/P1"] = (P_ratio, 0.75, inf, P_ratio >= 0.75)
+    return checks
 
 
 _Miller_1996_unsupported_type = "Supported orifice types are {}".format(str(
