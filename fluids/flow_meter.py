@@ -53,6 +53,9 @@ Orifice Plate Correlations
 .. autofunction:: C_uncertainty_orifice_ISO_5167_2_2022
 .. autofunction:: orifice_expansibility_uncertainty_ISO_5167_2_2022
 .. autodata:: ISO_15377_CONICAL_ORIFICE_C
+.. autofunction:: orifice_small_pipe_validity_ISO_15377_2018
+.. autofunction:: C_uncertainty_orifice_small_pipe_ISO_15377_2018
+.. autodata:: ISO_15377_SMALL_PIPE_C_UNCERTAINTY_INCREMENT
 
 Nozzle Flow Meters
 ------------------
@@ -111,6 +114,7 @@ __all__: list[str] = [
     "C_long_radius_nozzle",
     "C_quarter_circle_orifice_ISO_15377_1998",
     "C_uncertainty_orifice_ISO_5167_2_2022",
+    "C_uncertainty_orifice_small_pipe_ISO_15377_2018",
     "C_venturi_nozzle",
     "C_wedge_meter_ISO_5167_6_2017",
     "C_wedge_meter_Miller",
@@ -135,6 +139,7 @@ __all__: list[str] = [
     "orifice_expansibility",
     "orifice_expansibility_1989",
     "orifice_expansibility_uncertainty_ISO_5167_2_2022",
+    "orifice_small_pipe_validity_ISO_15377_2018",
     "orifice_validity_ISO_5167_2_2022",
     "velocity_of_approach_factor",
 ]
@@ -901,6 +906,210 @@ def orifice_validity_ISO_5167_2_2022(D: float, Do: float, taps: str="corner", Re
         P_ratio = P2/P1
         checks["P2/P1"] = (P_ratio, 0.75, inf, P_ratio >= 0.75)
     return checks
+
+
+# Square-edged orifice plates in pipes of 25 mm <= D < 50 mm, ISO/TR 15377:2018 clause 5.2
+ISO_15377_SMALL_PIPE_D_MIN = 0.025
+"""Minimum (inclusive) pipe diameter of a square-edged orifice plate in a small pipe according to ISO/TR 15377, [m]"""
+ISO_15377_SMALL_PIPE_D_MAX = 0.05
+"""Maximum (exclusive) pipe diameter of a square-edged orifice plate in a small pipe according to ISO/TR 15377, [m]"""
+ISO_15377_SMALL_PIPE_BETA_MIN = 0.5
+"""Minimum diameter ratio of a square-edged orifice plate in a small pipe according to ISO/TR 15377, [-]"""
+ISO_15377_SMALL_PIPE_BETA_MAX = 0.7
+"""Maximum diameter ratio of a square-edged orifice plate in a small pipe according to ISO/TR 15377, [-]"""
+ISO_15377_SMALL_PIPE_BETA_NOTE_MIN = 0.23
+"""Minimum diameter ratio a note of ISO/TR 15377 describes as possible for a square-edged orifice plate in a small
+pipe, below the stated minimum; not a limit of use, [-]"""
+ISO_15377_SMALL_PIPE_DO_NOTE = 0.0125
+"""Bore diameter of a square-edged orifice plate in a small pipe under which a note of ISO/TR 15377 warns that the
+uncertainty increases significantly; not a limit of use, [m]"""
+ISO_15377_SMALL_PIPE_C_UNCERTAINTY_INCREMENT = 0.005
+"""Additional relative uncertainty of the discharge coefficient of a square-edged orifice plate in a small pipe
+according to ISO/TR 15377, added arithmetically to the uncertainty given by ISO 5167-2, [-]"""
+
+
+def orifice_small_pipe_validity_ISO_15377_2018(D: float, Do: float, Re_D: float | None=None,
+                                               m: float | None=None, mu: float | None=None) -> dict:
+    r"""Checks a square-edged orifice plate with corner tappings installed
+    in a pipe smaller than those covered by ISO 5167-2 against the limits of
+    use given for that case in [1]_. Nothing is raised for out of range
+    inputs; each limit is reported with the actual value, the permitted
+    range, and whether or not it is satisfied.
+
+    Within these limits, [1]_ specifies that the discharge coefficient is
+    calculated with the Reader-Harris/Gallagher equation
+    (:obj:`C_Reader_Harris_Gallagher`) for corner tappings.
+
+    The limits of use checked are:
+
+    .. math::
+        0.025 \text{ m} \le D < 0.05 \text{ m}
+
+    .. math::
+        0.5 \le \beta \le 0.7
+
+    The pipe Reynolds number must also be within the limits of use of
+    ISO 5167-2 for corner tappings; that check is made by
+    :obj:`orifice_validity_ISO_5167_2_2022`.
+
+    A note in [1]_ also states:
+
+    .. math::
+        0.23 \le \beta < 0.5 \text{ is possible}
+
+    .. math::
+        \text{the uncertainty increases significantly if } D_o < 0.0125 \text{ m}
+
+    Parameters
+    ----------
+    D : float
+        Upstream internal pipe diameter, [m]
+    Do : float
+        Diameter of orifice at flow conditions, [m]
+    Re_D : float, optional
+        Reynolds number of the fluid with respect to the upstream pipe
+        diameter `D`; if not provided it is calculated from `m` and `mu`
+        when both of them are given, [-]
+    m : float, optional
+        Mass flow rate of fluid through the orifice, [kg/s]
+    mu : float, optional
+        Viscosity of fluid at `P1`, [Pa*s]
+
+    Returns
+    -------
+    checks : dict[str, tuple[float, float, float, bool]]
+        Dictionary with one entry per check which could be evaluated, each a
+        tuple of (actual value, minimum value, maximum value, whether the
+        check is satisfied). Where there is no maximum, infinity is given in
+        its place. The keys 'D', 'beta' and 'Re_D' are limits of use; the
+        keys 'beta note' and 'Do note' are the items of the note, which are
+        not limits. Values are in the same units as the inputs, [-]
+
+    Notes
+    -----
+    The two diameter ratio ranges are reported separately: 'beta' is the
+    stated limit of 0.5 to 0.7, and 'beta note' is the wider range of 0.23
+    to 0.7 that results from the note. A diameter ratio of 0.23 to under 0.5
+    therefore satisfies 'beta note' but not 'beta'; a diameter ratio in the
+    stated range satisfies both.
+
+    'Do note' is a warning, not a limit: it is not satisfied when the bore
+    is under 12.5 mm, where the note warns that the uncertainty increases
+    significantly. [1]_ gives no amount for that increase.
+
+    Whether or not every limit of use evaluated is satisfied can be found
+    with ``all(checks[k][3] for k in ('D', 'beta', 'Re_D') if k in checks)``.
+
+    The 'Re_D' entry is only present if `Re_D` or both of `m` and `mu` were
+    given. It is the corner tapping entry of
+    :obj:`orifice_validity_ISO_5167_2_2022`.
+
+    The upper limit of the pipe diameter is exclusive, as pipes of 50 mm and
+    larger are covered by ISO 5167-2; the other limits are inclusive. No
+    tolerance is applied to them.
+
+    [1]_ also requires the pipe to have a high-quality internal surface,
+    with roughness according to ISO 5167-2, and recommends corner tappings
+    of the carrier ring type; neither is checked.
+
+    [1]_ refers to the 2003 edition of ISO 5167-2 for the discharge
+    coefficient, the Reynolds number limits and the uncertainty; the
+    functions used here implement the 2022 edition.
+
+    Examples
+    --------
+    >>> checks = orifice_small_pipe_validity_ISO_15377_2018(D=0.04, Do=0.024,
+    ... m=0.5, mu=1E-3)
+    >>> checks['beta']
+    (0.6, 0.5, 0.7, True)
+    >>> checks['Re_D']
+    (15915.494309189, 5760.0, inf, True)
+    >>> all(checks[k][3] for k in ('D', 'beta', 'Re_D') if k in checks)
+    True
+
+    References
+    ----------
+    .. [1] ISO/TR 15377:2018 - Measurement of Fluid Flow by Means of
+       Pressure-Differential Devices - Guidelines for the Specification of
+       Orifice Plates, Nozzles and Venturi Tubes beyond the Scope of ISO 5167.
+       Clause 5.2.2, Limits of use, and clause 5.2.3.
+    """
+    beta = Do/D
+    checks: dict = {
+        "D": (D, ISO_15377_SMALL_PIPE_D_MIN, ISO_15377_SMALL_PIPE_D_MAX,
+              ISO_15377_SMALL_PIPE_D_MIN <= D < ISO_15377_SMALL_PIPE_D_MAX),
+        "beta": (beta, ISO_15377_SMALL_PIPE_BETA_MIN, ISO_15377_SMALL_PIPE_BETA_MAX,
+                 ISO_15377_SMALL_PIPE_BETA_MIN <= beta <= ISO_15377_SMALL_PIPE_BETA_MAX),
+    }
+    ISO_5167_checks = orifice_validity_ISO_5167_2_2022(D, Do, "corner", Re_D, m, mu)
+    if "Re_D" in ISO_5167_checks:
+        checks["Re_D"] = ISO_5167_checks["Re_D"]
+    checks["beta note"] = (beta, ISO_15377_SMALL_PIPE_BETA_NOTE_MIN, ISO_15377_SMALL_PIPE_BETA_MAX,
+                           ISO_15377_SMALL_PIPE_BETA_NOTE_MIN <= beta <= ISO_15377_SMALL_PIPE_BETA_MAX)
+    checks["Do note"] = (Do, ISO_15377_SMALL_PIPE_DO_NOTE, inf, Do >= ISO_15377_SMALL_PIPE_DO_NOTE)
+    return checks
+
+
+def C_uncertainty_orifice_small_pipe_ISO_15377_2018(D: float, Do: float, Re_D: float) -> float:
+    r"""Calculates the relative uncertainty of the discharge coefficient of a
+    square-edged orifice plate with corner tappings installed in a pipe of
+    25 mm to under 50 mm diameter, according to [1]_. It is the uncertainty
+    given by ISO 5167-2 (:obj:`C_uncertainty_orifice_ISO_5167_2_2022`) with
+    0.005 added arithmetically:
+
+    .. math::
+        U_{C, \text{small pipe}} = U_{C, \text{ISO 5167-2}} + 0.005
+
+    Parameters
+    ----------
+    D : float
+        Upstream internal pipe diameter, [m]
+    Do : float
+        Diameter of orifice at flow conditions, [m]
+    Re_D : float
+        Reynolds number of the fluid with respect to the upstream pipe
+        diameter `D`, [-]
+
+    Returns
+    -------
+    U_C : float
+        Relative uncertainty of the coefficient of discharge of the orifice,
+        [-]
+
+    Notes
+    -----
+    [1]_ gives the increment as 0.5 %; it is used here as a fraction, like
+    the ISO 5167-2 uncertainty it is added to.
+
+    The ISO 5167-2 uncertainty includes its additional term for pipe
+    diameters under 71.12 mm, which always applies in this range of pipe
+    sizes.
+
+    This uncertainty applies only within the limits of use checked by
+    :obj:`orifice_small_pipe_validity_ISO_15377_2018`; no check of this is
+    made. [1]_ warns that the uncertainty increases significantly for bores
+    under 12.5 mm, without giving an amount; that increase is not included.
+
+    [1]_ refers to the 2003 edition of ISO 5167-2 for the uncertainty of the
+    discharge coefficient; the function used here implements the 2022
+    edition.
+
+    The increment is also available as
+    `ISO_15377_SMALL_PIPE_C_UNCERTAINTY_INCREMENT`.
+
+    Examples
+    --------
+    >>> C_uncertainty_orifice_small_pipe_ISO_15377_2018(D=0.04, Do=0.024, Re_D=1E5)
+    0.01165401574803
+
+    References
+    ----------
+    .. [1] ISO/TR 15377:2018 - Measurement of Fluid Flow by Means of
+       Pressure-Differential Devices - Guidelines for the Specification of
+       Orifice Plates, Nozzles and Venturi Tubes beyond the Scope of ISO 5167.
+       Clause 5.2.3.
+    """
+    return C_uncertainty_orifice_ISO_5167_2_2022(D, Do, Re_D) + ISO_15377_SMALL_PIPE_C_UNCERTAINTY_INCREMENT
 
 
 _Miller_1996_unsupported_type = "Supported orifice types are {}".format(str(

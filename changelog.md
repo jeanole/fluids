@@ -11,6 +11,9 @@
 - `C_uncertainty_orifice_ISO_5167_2_2022` and `orifice_expansibility_uncertainty_ISO_5167_2_2022`: relative
   uncertainty of the discharge coefficient and expansibility factor of an orifice plate according to
   ISO 5167-2:2022.
+- `orifice_small_pipe_validity_ISO_15377_2018` and `C_uncertainty_orifice_small_pipe_ISO_15377_2018`: limits of
+  use and uncertainty of the discharge coefficient of a square-edged orifice plate with corner tappings in a pipe
+  of 25 mm to under 50 mm diameter, according to ISO/TR 15377:2018 clause 5.2.
 
 ### Changed
 

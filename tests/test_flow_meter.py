@@ -66,6 +66,7 @@ from fluids.flow_meter import (
     C_Miller_1996,
     C_quarter_circle_orifice_ISO_15377_1998,
     C_uncertainty_orifice_ISO_5167_2_2022,
+    C_uncertainty_orifice_small_pipe_ISO_15377_2018,
     C_Reader_Harris_Gallagher,
     C_Reader_Harris_Gallagher_wet_venturi_tube,
     C_venturi_nozzle,
@@ -91,6 +92,7 @@ from fluids.flow_meter import (
     orifice_expansibility,
     orifice_expansibility_1989,
     orifice_expansibility_uncertainty_ISO_5167_2_2022,
+    orifice_small_pipe_validity_ISO_15377_2018,
     orifice_validity_ISO_5167_2_2022,
     velocity_of_approach_factor,
 )
@@ -196,6 +198,48 @@ def test_orifice_validity_ISO_5167_2_2022():
 
     with pytest.raises(ValueError):
         orifice_validity_ISO_5167_2_2022(D=0.1, Do=0.05, taps="NOTALOCATION")
+
+def test_orifice_small_pipe_validity_ISO_15377_2018():
+    assert flow_meter_module.ISO_15377_SMALL_PIPE_D_MIN == 0.025
+    assert flow_meter_module.ISO_15377_SMALL_PIPE_D_MAX == 0.05
+    assert flow_meter_module.ISO_15377_SMALL_PIPE_BETA_MIN == 0.5
+    assert flow_meter_module.ISO_15377_SMALL_PIPE_BETA_MAX == 0.7
+    assert flow_meter_module.ISO_15377_SMALL_PIPE_BETA_NOTE_MIN == 0.23
+    assert flow_meter_module.ISO_15377_SMALL_PIPE_DO_NOTE == 0.0125
+    assert flow_meter_module.ISO_15377_SMALL_PIPE_C_UNCERTAINTY_INCREMENT == 0.005
+
+    checks = orifice_small_pipe_validity_ISO_15377_2018(D=0.04, Do=0.024, m=0.5, mu=1E-3)
+    assert list(checks.keys()) == ["D", "beta", "Re_D", "beta note", "Do note"]
+    assert_close1d([check[0] for check in checks.values()], [0.04, 0.6, 15915.494309189533, 0.6, 0.024])
+    assert_close(checks["Re_D"][1], 5760.0)
+    assert [check[3] for check in checks.values()] == [True, True, True, True, True]
+    assert checks["beta note"][1:3] == (0.23, 0.7)
+    assert list(orifice_small_pipe_validity_ISO_15377_2018(D=0.04, Do=0.024).keys()) == ["D", "beta", "beta note", "Do note"]
+
+    # Pipe diameter: lower limit inclusive, upper exclusive
+    assert orifice_small_pipe_validity_ISO_15377_2018(D=0.025, Do=0.015)["D"][3] is True
+    assert orifice_small_pipe_validity_ISO_15377_2018(D=0.05, Do=0.03)["D"][3] is False
+
+    # Stated diameter ratio range and the wider range of the note, both inclusive
+    for Do, expect in ((0.22, (False, False)), (0.23, (False, True)), (0.49, (False, True)),
+                       (0.5, (True, True)), (0.7, (True, True)), (0.71, (False, False))):
+        checks = orifice_small_pipe_validity_ISO_15377_2018(D=1.0, Do=Do)
+        assert (checks["beta"][3], checks["beta note"][3]) == expect
+
+    # Bore under 12.5 mm is a warning in the note, not a limit
+    assert orifice_small_pipe_validity_ISO_15377_2018(D=0.03, Do=0.009)["Do note"] == (0.009, 0.0125, inf, False)
+
+    # Reynolds number limits are those of ISO 5167-2 for corner taps
+    assert orifice_small_pipe_validity_ISO_15377_2018(D=0.04, Do=0.02, Re_D=5000.0)["Re_D"] == (5000.0, 5000.0, inf, True)
+    assert orifice_small_pipe_validity_ISO_15377_2018(D=0.04, Do=0.028, Re_D=7000.0)["Re_D"][3] is False
+
+
+def test_C_uncertainty_orifice_small_pipe_ISO_15377_2018():
+    # ISO 5167-2 uncertainty, including its small pipe term, plus 0.5 %
+    assert_close(C_uncertainty_orifice_small_pipe_ISO_15377_2018(D=0.04, Do=0.024, Re_D=1e5), 0.011654015748031496)
+    # With the low Reynolds number term of ISO 5167-2 as well
+    assert_close(C_uncertainty_orifice_small_pipe_ISO_15377_2018(D=0.04, Do=0.024, Re_D=8000.0), 0.016654015748031496)
+
 
 def test_C_Miller_1996():
     C_flange_ISO = C_Reader_Harris_Gallagher(D=0.07391, Do=0.0222, rho=1.165, mu=1.85E-5, m=0.12, taps="flange")
